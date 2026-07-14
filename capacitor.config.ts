@@ -6,7 +6,6 @@ const config: CapacitorConfig = {
   appId: "com.luojuan.app",
   appName: "落卷",
   webDir: "capacitor-shell",
-  bundledWebRuntime: false,
   server: serverUrl
     ? {
         url: serverUrl,
@@ -14,9 +13,6 @@ const config: CapacitorConfig = {
         allowNavigation: ["*"],
       }
     : undefined,
-  android: {
-    allowMixedContent: true,
-  },
 };
 
 export default config;
