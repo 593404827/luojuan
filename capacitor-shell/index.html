@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>落卷 App 壳</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(180deg, #f7f1eb, #efe4d8);
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
+          sans-serif;
+        color: #2e241d;
+      }
+      main {
+        width: min(92vw, 420px);
+        padding: 28px 24px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 20px 50px rgba(55, 40, 30, 0.12);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 28px;
+      }
+      p {
+        margin: 0;
+        line-height: 1.7;
+        color: #6b5b4e;
+      }
+      code {
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: rgba(109, 85, 234, 0.1);
+        color: #6d55ea;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>落卷 App 壳已就绪</h1>
+      <p>
+        当前 App 封装已经接好。要在手机里看到真实页面，请在打包前配置
+        <code>CAPACITOR_SERVER_URL</code>，让 App 指向你的开发地址或线上地址。
+      </p>
+    </main>
+  </body>
+</html>
