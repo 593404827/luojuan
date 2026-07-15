@@ -114,6 +114,23 @@ function createDirectPrompt() {
   };
 }
 
+function getChatMetaLabel(metaCode: string | null) {
+  switch (metaCode) {
+    case "mock_missing_key":
+      return "当前使用本地 mock 回复，可在配置 DeepSeek API Key 后切换为真实模型";
+    case "mock_request_failed":
+      return "DeepSeek 请求失败，已回退到本地 mock";
+    case "mock_no_upstream_body":
+      return "DeepSeek 无流式响应体，已回退到本地 mock";
+    case "deepseek_live":
+      return "DeepSeek 实时回复";
+    case "fallback_exception":
+      return "接口异常，已回退为本地 mock";
+    default:
+      return "正在生成回复…";
+  }
+}
+
 export default function Home() {
   const initialState = useMemo(() => createDefaultAppState(), []);
   const [authStatus, setAuthStatus] = useState<"loading" | "authenticated" | "unauthenticated">(
@@ -566,7 +583,16 @@ export default function Home() {
 
         setChatState((prev) => ({
           ...prev,
-          [currentMode]: [...nextMessages, { ...pendingAiMessage, content: accumulated, meta: response.headers.get("X-Chat-Meta") || "正在生成回复…" }],
+          [
+            currentMode
+          ]: [
+            ...nextMessages,
+            {
+              ...pendingAiMessage,
+              content: accumulated,
+              meta: getChatMetaLabel(response.headers.get("X-Chat-Meta")),
+            },
+          ],
         }));
       }
 
@@ -577,7 +603,7 @@ export default function Home() {
           {
             ...pendingAiMessage,
             content: accumulated || "我先记下这一段。你愿意再往下讲一点吗？",
-            meta: response.headers.get("X-Chat-Meta") || "DeepSeek 实时回复",
+            meta: getChatMetaLabel(response.headers.get("X-Chat-Meta")),
           },
         ],
       }));

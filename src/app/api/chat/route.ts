@@ -109,7 +109,7 @@ export async function POST(request: Request) {
         status: 200,
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
-          "X-Chat-Meta": "当前使用本地 mock 回复，可在配置 DeepSeek API Key 后切换为真实模型",
+          "X-Chat-Meta": "mock_missing_key",
         },
       });
     }
@@ -140,12 +140,12 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
+      await response.text();
       return new Response(streamFromText(mockReplies[payload.mode]), {
         status: 200,
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
-          "X-Chat-Meta": `DeepSeek 请求失败，已回退到本地 mock：${errorText}`,
+          "X-Chat-Meta": "mock_request_failed",
         },
       });
     }
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
         status: 200,
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
-          "X-Chat-Meta": "DeepSeek 无流式响应体，已回退到本地 mock",
+          "X-Chat-Meta": "mock_no_upstream_body",
         },
       });
     }
@@ -223,15 +223,15 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
-        "X-Chat-Meta": "DeepSeek 实时回复",
+        "X-Chat-Meta": "deepseek_live",
       },
     });
-  } catch (error) {
+  } catch {
     return new Response(streamFromText(mockReplies.random), {
       status: 200,
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "X-Chat-Meta": `接口异常，已回退为本地 mock：${String(error)}`,
+        "X-Chat-Meta": "fallback_exception",
       },
     });
   }
