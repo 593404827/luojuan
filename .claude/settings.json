@@ -14,7 +14,20 @@
       "Bash(node -e \"const { Document, Packer, Paragraph } = require\\('docx'\\); const d = new Document\\({sections:[{children:[new Paragraph\\('test'\\)]}]}\\); Packer.toBuffer\\(d\\).then\\(b => console.log\\('docx ok, size:', b.length\\)\\);\")",
       "Bash(node -e \"const PDFDocument = require\\('pdfkit'\\); const d = new PDFDocument\\({size:'A4',margin:54}\\); const c=[]; d.on\\('data',chunk=>c.push\\(chunk\\)\\); d.fontSize\\(12\\).text\\('test'\\); d.end\\(\\); d.on\\('end',\\(\\)=>console.log\\('pdf ok, size:', Buffer.concat\\(c\\).length\\)\\);\")",
       "Bash(npx @railway/cli deployment list)",
-      "Bash(git commit -m 'fix: docx/pdf export by adding serverExternalPackages, add error handling *)"
+      "Bash(git commit -m 'fix: docx/pdf export by adding serverExternalPackages, add error handling *)",
+      "Bash(curl -s -c /tmp/rw_cookies.txt -b /tmp/rw_cookies.txt -H 'Content-Type: application/json' -d '{\"username\":\"0822\",\"password\":\"0822\"}' https://luojuan-production.up.railway.app/api/auth/login)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt https://luojuan-production.up.railway.app/api/auth/session)",
+      "Bash(curl -s -w '\\\\nHTTP %{http_code}, size %{size_download} bytes' -b /tmp/rw_cookies.txt https://luojuan-production.up.railway.app/api/export/docx)",
+      "Bash(curl -s -w '\\\\nHTTP %{http_code}, size %{size_download} bytes' -b /tmp/rw_cookies.txt https://luojuan-production.up.railway.app/api/export/pdf)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt https://luojuan-production.up.railway.app/api/export/docx)",
+      "Bash(curl -v -b /tmp/rw_cookies.txt https://luojuan-production.up.railway.app/api/export/docx)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt https://luojuan-production.up.railway.app/)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt -o /dev/null -w 'HTTP %{http_code}, size %{size_download}' https://luojuan-production.up.railway.app/api/export/docx)",
+      "Bash(npx @railway/cli whoami)",
+      "Read(//Users/bytedance/.railway/**)",
+      "Bash(curl -s https://api.railway.com/graphql/v2 -H 'Content-Type: application/json' -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -d '{\"query\":\"{ viewer { projects { edges { node { id name services { edges { node { id name } } } } } } } }\"}')",
+      "Bash(npx next *)",
+      "Bash(git commit -m 'fix: restore BodyInit cast for type compatibility *)"
     ]
   }
 }
