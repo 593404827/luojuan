@@ -13,6 +13,10 @@ function safeFileName(name: string) {
     .slice(0, 60);
 }
 
+function asciiFileName(name: string) {
+  return name.replace(/[^\x20-\x7E]/g, "_");
+}
+
 async function renderPdfBuffer(input: {
   title: string;
   dateTag: string;
@@ -106,12 +110,14 @@ export async function GET() {
     });
 
     const fileName = `${safeFileName(bookTitle)}_${dateTag}.pdf`;
+    const asciiName = `${asciiFileName(safeFileName(bookTitle))}_${dateTag}.pdf`;
+    const encodedName = encodeURIComponent(fileName);
 
     return new Response(buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
       },
     });
   } catch (error) {

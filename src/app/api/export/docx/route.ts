@@ -13,6 +13,10 @@ function safeFileName(name: string) {
     .slice(0, 60);
 }
 
+function asciiFileName(name: string) {
+  return name.replace(/[^\x20-\x7E]/g, "_");
+}
+
 export async function GET() {
   try {
     const session = await getCurrentSession();
@@ -105,13 +109,15 @@ export async function GET() {
 
     const buffer = await Packer.toBuffer(doc);
     const fileName = `${safeFileName(bookTitle)}_${dateTag}.docx`;
+    const asciiName = `${asciiFileName(safeFileName(bookTitle))}_${dateTag}.docx`;
+    const encodedName = encodeURIComponent(fileName);
 
     return new Response(buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
       },
     });
   } catch (error) {

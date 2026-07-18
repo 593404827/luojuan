@@ -27,7 +27,14 @@
       "Read(//Users/bytedance/.railway/**)",
       "Bash(curl -s https://api.railway.com/graphql/v2 -H 'Content-Type: application/json' -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -d '{\"query\":\"{ viewer { projects { edges { node { id name services { edges { node { id name } } } } } } } }\"}')",
       "Bash(npx next *)",
-      "Bash(git commit -m 'fix: restore BodyInit cast for type compatibility *)"
+      "Bash(git commit -m 'fix: restore BodyInit cast for type compatibility *)",
+      "Bash(git config *)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(gh auth *)",
+      "Bash(git -c core.compression=0 push)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt -o /dev/null -w 'DOCX: HTTP %{http_code}, size %{size_download}' https://luojuan-production.up.railway.app/api/export/docx)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt -o /dev/null -w 'PDF: HTTP %{http_code}, size %{size_download}' https://luojuan-production.up.railway.app/api/export/pdf)",
+      "Bash(git commit -m 'fix: Content-Disposition header with Chinese chars *)"
     ]
   }
 }
