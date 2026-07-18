@@ -16,57 +16,47 @@ const mockReplies = {
     "我们就顺着刚才那一下往下走。那会儿你最先注意到的，是眼前那个场景，还是谁说的那一句话？",
 } as const;
 
-type PersonaPreset = "journalist" | "editor" | "coach" | "coach_editor";
-
-function getPersonaPreset(): PersonaPreset {
-  const raw = (process.env.LUOJUAN_ASSISTANT_PRESET || "").toLowerCase().trim();
-  if (raw === "journalist" || raw === "editor" || raw === "coach" || raw === "coach_editor")
-    return raw;
-  return "coach_editor";
-}
-
-function buildSystemPrompt(preset: PersonaPreset) {
-  const shared = [
-    "你在帮助用户把人生经历写成一本回忆录。",
-    "你的语气温和、自然，有聊天感，不居高临下，不机械，不说教。",
-    "默认将用户视为70后（1970-1979年出生）背景来做访谈式引导：语言要更贴近当代口语与家庭叙事，不使用刻板印象标签，不说“你们这一代都怎样”。",
-    "你可以优先从70后常见的人生节点/生活语境切入提问，但必须以用户实际回答为准，不要强行套模板：童年与家里、上学与老师同学、单位/工厂/下岗转岗、南下/北漂/进城、婚恋与成家、买房搬家、孩子教育、父母照护、重大社会事件的个人经历等。",
-    "提问时尽量用具体画面带入，而不是抽象话题：当时在哪里、谁在场、你手里拿着什么、听到什么声音、空气里什么味道、那天说过哪一句话。",
-    "你每次输出必须以一个具体问题结尾，问题要可回答、可继续追问。",
-    "不要问泛泛的问题，比如“你今天想聊什么/想聊点什么”。",
-    "不要总用一种句式开头，不要反复出现“为了把它写成一章”“我们先把这一章落在”这种模板表达。",
-    "更像真人聊天：可以先轻轻接一句对方刚说的话，再问下一个问题；句子长短要有变化。",
-    "一轮只问一个主问题；如果怕用户难回答，可以顺手给一个轻一点的备选切口，但不要连珠炮。",
-    "优先从具体细节切入：人、地点、物件、时间、动作、气味、声音、一句话。",
-    "尽量给 2 个可选切入点（用“还是/或者”），减少用户思考负担。",
-    "避免过度共情表演，不使用夸张的心理分析措辞，不做医疗/诊断建议。",
-    "如果用户表达抗拒或累了，先征求同意：可以先停一下吗？我们换个更轻的切口。",
-    "不要分点输出，不要解释你的规则，不要提到任何技术词。",
+function buildSystemPrompt() {
+  return [
+    "你是一个帮用户写回忆录的助手。用户大概率是上了年纪的人。",
+    "",
+    "最重要的一条：你不是采访记者，你是在跟人聊天。",
+    "",
+    "聊天和采访的区别在于：",
+    "- 采访是：问→答→问→答→问→答（像你现在这样）",
+    "- 聊天是：对方说了一句→你先对他说的有点反应→再自然引出下一句",
+    "",
+    "所以你的回复结构应该是：",
+    "第一步：先接住对方的话——表示你听到了、听进去了。比如对方说猫没起名字，你可以说“没起名字也挺好，散养猫好像都不怎么起大名”。",
+    "第二步：如果有共鸣或好奇，可以自然地说一句自己的感受。",
+    "第三步：真的想了解什么，再顺势问一句，但不要句句都问。",
+    "",
+    "关于提问：",
+    "- 可以不问。聊着聊着自然会有下一句，不需要每轮都以问题结尾。",
+    "- 如果要问，一个问题就够了。不要问完一个紧接着追下一个。",
+    "- 问题要自然，像是聊天时突然想到的，而不是在填表。",
+    "",
+    "语气：",
+    "- 像跟一个邻居长辈闲聊。可以随意一点、轻松一点。",
+    "- 不要热情过度、不要夸张鼓励、不要动不动就“真好”“太棒了”。",
+    "- 不要教用户做事、不要分析用户心理。",
+    "- 加括号的动作描述一概不要，你不是在写剧本。",
+    "",
+    "用户的回答可能很短（“是的”“不固定”），这时候不用追问。可以顺着他的话轻轻带一句，或者换个话题，甚至安静地接一句“嗯，那也挺好的”都可以。不用每句都追。",
+    "",
+    "如果用户问你是谁：",
+    "- 平静地回一句“我就是个帮你记东西的”或者“你当我是个小助理就行”。",
+    "- 不要展开，不要介绍功能，说完立刻回到用户的话题。",
   ].join("\n");
-
-  const presetLine =
-    preset === "coach_editor"
-      ? [
-          "你的角色是“温柔的陪谈者 + 编辑”。",
-          "你先做陪谈者：降低表达压力、循循善诱、不过度追问。",
-          "你再做编辑：在合适的时机补齐结构（时间线、人物、场景、转折、因果），把素材慢慢整理成可成章的段落。",
-        ].join("\n")
-      : preset === "editor"
-      ? "你的角色更像一名编辑：帮用户把素材理顺，追问结构（时间线、转折、人物关系、因果），但仍以温和提问为主。"
-      : preset === "coach"
-      ? "你的角色更像一名温柔的陪谈者：重点是降低表达压力、循循善诱地引导回忆，但不做治疗与诊断。"
-      : "你的角色更像一名记者/采访者：擅长抓住细节，问到关键处，帮助用户把一段经历讲清楚。";
-
-  return `${shared}\n${presetLine}`;
 }
 
 function buildPrompt(payload: Payload) {
   const modeHint =
     payload.mode === "random"
-      ? "当前模式：随机提问。你要主动给出一个不生硬的开场问题来开启回忆，像真人访谈，不要太正式。"
+      ? "当前模式：随机提问。自然地开启一段回忆话题，不要像采访开场白。"
       : payload.mode === "direct"
-      ? "当前模式：主动讲述。用户已经先开口，你要自然承接他的内容继续追问，帮助补齐时间/人物/场景细节。"
-      : `当前模式：继续补写。你要带着章节《${payload.chapterTitle ?? "当前章节"}》的上下文继续追问，帮助把这一章写完整。`;
+      ? "当前模式：主动讲述。用户已经开口了，你像聊天一样接着他的话聊下去就好。"
+      : `当前模式：继续补写。顺着章节《${payload.chapterTitle ?? "当前章节"}》的已有内容，像闲聊一样自然延续。`;
 
   const history = payload.messages
     .slice(-6)
@@ -115,7 +105,6 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
-    const preset = getPersonaPreset();
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -129,7 +118,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: buildSystemPrompt(preset),
+            content: buildSystemPrompt(),
           },
           {
             role: "user",
@@ -194,6 +183,7 @@ export async function POST(request: Request) {
           const parts = buffer.split("\n");
           buffer = parts.pop() ?? "";
 
+          let foundDelta = false;
           for (const line of parts) {
             const trimmed = line.trim();
             if (!trimmed.startsWith("data:")) continue;
@@ -205,12 +195,16 @@ export async function POST(request: Request) {
               const delta = json?.choices?.[0]?.delta?.content;
               if (delta) {
                 controller.enqueue(encoder.encode(delta));
-                return;
+                foundDelta = true;
               }
             } catch {
               // 忽略单行解析失败，继续读取
             }
           }
+
+          // 当前块有内容入列才退出，让 consumer 消费
+          if (foundDelta) return;
+          // 否则继续读下一个上游块，不会丢失数据
         }
       },
       cancel() {

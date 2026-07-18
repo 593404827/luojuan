@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth";
-import { loadAppState, saveAppState } from "@/lib/persistence";
+import { loadAppState, loadCommunityWorks, saveAppState } from "@/lib/persistence";
 
 export async function GET() {
   try {
@@ -8,8 +8,15 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ message: "未登录" }, { status: 401 });
     }
-    const state = await loadAppState();
-    return NextResponse.json(state);
+    const [state, communityWorks] = await Promise.all([
+      loadAppState(session.username),
+      loadCommunityWorks(),
+    ]);
+    return NextResponse.json({
+      username: session.username,
+      state,
+      communityWorks,
+    });
   } catch (error) {
     return NextResponse.json(
       { message: "读取应用状态失败", error: String(error) },
@@ -25,7 +32,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: "未登录" }, { status: 401 });
     }
     const payload = await request.json();
-    const state = await saveAppState(payload);
+    const state = await saveAppState(session.username, payload);
     return NextResponse.json(state);
   } catch (error) {
     return NextResponse.json(

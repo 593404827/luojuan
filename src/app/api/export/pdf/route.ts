@@ -84,7 +84,7 @@ export async function GET() {
     return NextResponse.json({ message: "未登录" }, { status: 401 });
   }
 
-  const state = await loadAppState();
+  const state = await loadAppState(session.username);
   const bookTitle = state.bookTitle?.trim() || "落卷回忆录";
   const now = new Date();
   const dateTag = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(

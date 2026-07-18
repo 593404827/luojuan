@@ -17,6 +17,20 @@ export type StoredChapter = {
   cover: string;
 };
 
+export type CommunityWork = {
+  id: string;
+  sourceChapterId: string;
+  title: string;
+  authorUsername: string;
+  authorName: string;
+  authorLabel: string;
+  summary: string;
+  content: string[];
+  tags: string[];
+  cover: string;
+  publishedAt: string;
+};
+
 export type AppState = {
   bookTitle: string;
   currentChapterId: string;
@@ -29,7 +43,7 @@ export type AppState = {
 
 export function createDefaultAppState(): AppState {
   return {
-    bookTitle: "妈妈的一生",
+    bookTitle: "我的回忆录",
     currentChapterId: "",
     selectedFilters: [],
     draft: {
@@ -45,4 +59,8 @@ export function createDefaultAppState(): AppState {
     },
     updatedAt: new Date().toISOString(),
   };
+}
+
+export function createEmptyCommunityWorks(): CommunityWork[] {
+  return [];
 }

@@ -2,18 +2,37 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  getWorkById,
   type ChatMode,
   type Message,
   type ScreenKey,
 } from "@/lib/demo-content";
-import { createDefaultAppState, type DraftState, type StoredChapter } from "@/lib/app-state";
+import {
+  createDefaultAppState,
+  type CommunityWork,
+  type DraftState,
+  type StoredChapter,
+} from "@/lib/app-state";
 
 const modeMap: Record<"random" | "direct" | "continue", ScreenKey> = {
   random: "chat-random",
   direct: "chat-direct",
   continue: "chat-continue",
 };
+
+/** 生成 UUID，兼容非安全上下文（局域网 IP 访问 dev server 时 crypto.randomUUID 不可用） */
+function generateId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // 非安全上下文（如 http://10.x.x.x）会抛异常，走兜底
+    }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 
 function getChatHeaderTitle(args: {
   mode: ChatMode;
@@ -58,7 +77,7 @@ function guessTitleFromText(text: string, mode: ChatMode) {
 }
 
 function extractTags(text: string) {
-  const candidates = ["妈妈", "小时候", "家里", "离家", "院子", "火车", "学校", "工作", "家乡"];
+  const candidates = ["小时候", "家里", "离家", "院子", "火车", "学校", "工作", "家乡", "童年"];
   const matched = candidates.filter((item) => text.includes(item));
   return matched.slice(0, 3);
 }
@@ -79,7 +98,7 @@ function createDraft(mode: ChatMode, messages: Message[], existingTitle?: string
 function createContinuePrompt(draft: DraftState) {
   if (!draft.content) {
     return {
-      id: crypto.randomUUID(),
+      id: generateId(),
       role: "ai" as const,
       content: "如果你想继续写，我们就从上一段最想补充的地方接着讲。",
       meta: "继续补写",
@@ -87,7 +106,7 @@ function createContinuePrompt(draft: DraftState) {
   }
 
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     role: "ai" as const,
     content: `你刚才已经提到了“${shortText(draft.content, 18)}”。如果继续往下补，你最想先多讲一点当时的场景，还是当时身边的人？`,
     meta: "继续补写",
@@ -95,18 +114,26 @@ function createContinuePrompt(draft: DraftState) {
 }
 
 function createRandomPrompt() {
+  const openers = [
+    "你好呀，我是来帮你写回忆录的。咱们先从哪儿说起呢——你最先想起来的是一个人、一个地方，还是一样东西？",
+    "你好啊～我是你的回忆录小助手。你最近常常想起的，是哪段日子？",
+    "总算见到你了！你平时爱聊以前的事吗？还是说有什么事情一直想记下来，但一直没动笔？",
+    "嗨，我是来帮你记故事的。你先随便说说——你记忆里最早的那个画面是什么？",
+    "你好呀。你小时候住的地方，你现在还能想起来长什么样吗？",
+    "很高兴见到你！你觉得自己这辈子最值得写下来的，是哪一段经历？",
+  ];
+  const pick = openers[Math.floor(Math.random() * openers.length)];
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     role: "ai" as const,
-    content:
-      "我们先从一个具体画面开始：你最先想起的是一个人、一个地方，还是一件东西？你先挑一个讲讲。",
+    content: pick,
     meta: "随机提问",
   };
 }
 
 function createDirectPrompt() {
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     role: "ai" as const,
     content:
       "你可以直接从最想写进书里的一件事开始。为了帮你把它写清楚：这件事大概发生在什么时候？当时你身边最重要的那个人是谁？",
@@ -137,16 +164,20 @@ export default function Home() {
     "loading"
   );
   const [authUsername, setAuthUsername] = useState("");
+  const [authAccounts, setAuthAccounts] = useState<
+    Array<{ username: string; displayName: string; authorLabel: string }>
+  >([]);
+  const [easyAccessMode, setEasyAccessMode] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
-  const [loginHint, setLoginHint] = useState("");
   const [loginError, setLoginError] = useState("");
   const [screen, setScreen] = useState<ScreenKey>("home");
   const [bookTitle] = useState(initialState.bookTitle);
   const [selectedChapterId, setSelectedChapterId] = useState(initialState.currentChapterId);
-  const [selectedWorkId] = useState("work-river");
+  const [selectedWorkId, setSelectedWorkId] = useState("");
   const [currentMode, setCurrentMode] = useState<ChatMode>("random");
   const [draft, setDraft] = useState<DraftState>(initialState.draft);
   const [chapters, setChapters] = useState<StoredChapter[]>(initialState.chapters);
+  const [communityWorks, setCommunityWorks] = useState<CommunityWork[]>([]);
   const [chatState, setChatState] = useState<Record<ChatMode, Message[]>>(initialState.conversations);
   const [draftInput, setDraftInput] = useState<Record<ChatMode, string>>({
     random: "",
@@ -159,6 +190,7 @@ export default function Home() {
   const [chapterEditContent, setChapterEditContent] = useState("");
   const [shareHint, setShareHint] = useState("");
   const [organizeHint, setOrganizeHint] = useState("");
+  const [communityHint, setCommunityHint] = useState("");
   const [pendingFilters, setPendingFilters] = useState<Record<string, string>>({
     topic: initialState.selectedFilters[0] ?? "第一次离家",
     era: initialState.selectedFilters[1] ?? "80年代",
@@ -175,10 +207,20 @@ export default function Home() {
     () => chapters.find((chapter) => chapter.id === selectedChapterId) ?? chapters[0] ?? null,
     [chapters, selectedChapterId]
   );
-  const selectedWork = useMemo(() => getWorkById(selectedWorkId), [selectedWorkId]);
+  const selectedWork = useMemo(
+    () =>
+      communityWorks.find((work) => work.id === selectedWorkId) ??
+      communityWorks[0] ??
+      null,
+    [communityWorks, selectedWorkId]
+  );
   const currentProgressChapter = useMemo(
     () => chapters.find((chapter) => chapter.id === selectedChapterId) ?? chapters[0],
     [chapters, selectedChapterId]
+  );
+  const currentAccount = useMemo(
+    () => authAccounts.find((account) => account.username === authUsername) ?? null,
+    [authAccounts, authUsername]
   );
   const userMessages = useMemo(
     () =>
@@ -191,23 +233,6 @@ export default function Home() {
   const hasDraftProgress = Boolean(draft.content.trim());
   const hasChapterProgress = chapters.length > 0;
   const hasContinueProgress = hasChapterProgress || hasDraftProgress || userMessages.length > 0;
-  const homeProgressTitle = hasChapterProgress
-    ? currentProgressChapter?.title || "这一章"
-    : hasDraftProgress
-    ? draft.title || "待整理的这一段"
-    : "还没有开始第一段";
-  const homeProgressText = hasChapterProgress
-    ? currentProgressChapter?.summary ||
-      currentProgressChapter?.content?.[0] ||
-      "这一章已经开始形成。"
-    : hasDraftProgress
-    ? `最近一次讲述：${shortText(draft.content, 72)}`
-    : "完成第一轮讲述后，这里会显示当前进度和最近一次回忆内容。";
-  const continueHintText = hasChapterProgress
-    ? "顺着上一章继续往下讲。"
-    : hasDraftProgress || latestUserMessage
-    ? `顺着刚才这段继续：${shortText(draft.content || latestUserMessage, 30)}`
-    : "完成第一段讲述后，这里会出现继续入口。";
   const hasPreviewContent = Boolean(draft.content.trim());
   const previewTitle = draft.title?.trim() || "这一章的预览";
   const previewSummary = draft.content?.trim()
@@ -223,21 +248,30 @@ export default function Home() {
 
     async function hydrateSession() {
       try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+
+        const response = await fetch("/api/auth/session", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
         const data = await response.json();
         if (cancelled) return;
 
         if (data.authenticated) {
           setAuthUsername(data.username);
+          setAuthAccounts(data.accounts ?? []);
+          setEasyAccessMode(Boolean(data.easyAccess));
           setAuthStatus("authenticated");
         } else {
+          setAuthAccounts(data.accounts ?? []);
+          setEasyAccessMode(Boolean(data.easyAccess));
           setLoginForm((prev) => ({
             ...prev,
             username: data.defaultUsernameHint || prev.username,
           }));
-          if (!data.hasCustomCredentials) {
-            setLoginHint("当前还是开发默认账号，后续请在 .env.local 中改成你自己的私有账号密码。");
-          }
           setAuthStatus("unauthenticated");
         }
       } catch {
@@ -261,10 +295,15 @@ export default function Home() {
       try {
         const response = await fetch("/api/app-state", { cache: "no-store" });
         if (!response.ok) throw new Error("load failed");
-        const state = await response.json();
+        const payload = await response.json();
         if (cancelled) return;
 
-    setSelectedChapterId(state.currentChapterId || "");
+        const state = payload.state ?? payload;
+        const works = payload.communityWorks ?? [];
+        setAuthUsername(payload.username || "");
+        setSelectedChapterId(state.currentChapterId || "");
+        setSelectedWorkId((prev) => prev || works[0]?.id || "");
+        setCommunityWorks(works);
         setDraft(state.draft);
         setChapters(state.chapters);
         setChatState(state.conversations);
@@ -335,44 +374,98 @@ export default function Home() {
   };
 
   const openChatMode = (mode: ChatMode) => {
-    if (mode === "random" && chatState.random.length === 0) {
+    if (mode === "random" && !chatState.random.some((m) => m.role === "user")) {
+      const prompt = createRandomPrompt();
       setChatState((prev) => ({
         ...prev,
-        random: [createRandomPrompt()],
+        random: [{ ...prompt, content: "", meta: "正在准备…" }],
       }));
+      streamIntoMessage(mode, prompt.content);
     }
 
-    if (mode === "direct" && chatState.direct.length === 0) {
+    if (mode === "direct" && !chatState.direct.some((m) => m.role === "user")) {
+      const prompt = createDirectPrompt();
       setChatState((prev) => ({
         ...prev,
-        direct: [createDirectPrompt()],
+        direct: [{ ...prompt, content: "", meta: "正在准备…" }],
       }));
+      streamIntoMessage(mode, prompt.content);
     }
 
-    if (mode === "continue" && chatState.continue.length === 0 && hasContinueProgress) {
+    if (mode === "continue" && !chatState.continue.some((m) => m.role === "user") && hasContinueProgress) {
+      const prompt = createContinuePrompt(draft);
       setChatState((prev) => ({
         ...prev,
-        continue: [createContinuePrompt(draft)],
+        continue: [{ ...prompt, content: "", meta: "正在准备…" }],
       }));
+      streamIntoMessage(mode, prompt.content);
     }
 
     setCurrentMode(mode);
     setScreen(modeMap[mode]);
   };
 
+  const initialStreamMap = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+
+  const streamIntoMessage = (mode: ChatMode, text: string) => {
+    const existing = initialStreamMap.current[mode];
+    if (existing) clearInterval(existing);
+
+    const metaLabel = mode === "direct" ? "主动讲述" : mode === "continue" ? "继续补写" : "随机提问";
+    let index = 0;
+    const chunkSize = 3;
+    const timer = setInterval(() => {
+      if (index >= text.length) {
+        clearInterval(timer);
+        delete initialStreamMap.current[mode];
+        return;
+      }
+      const nextIndex = Math.min(index + chunkSize, text.length);
+      const chunk = text.slice(index, nextIndex);
+      index = nextIndex;
+      setChatState((prev) => ({
+        ...prev,
+        [mode]: prev[mode].map((msg, i) =>
+          i === 0 ? { ...msg, content: msg.content + chunk, meta: metaLabel } : msg,
+        ),
+      }));
+    }, 28);
+    initialStreamMap.current[mode] = timer;
+  };
+
   const clearCurrentConversation = () => {
-    setChatState((prev) => ({
-      ...prev,
-      [currentMode]:
-        currentMode === "random"
-          ? [createRandomPrompt()]
-          : currentMode === "direct"
-          ? [createDirectPrompt()]
-          : hasContinueProgress
-          ? [createContinuePrompt(draft)]
-          : [],
-    }));
-    setDraftInput((prev) => ({ ...prev, [currentMode]: "" }));
+    const mode = currentMode;
+    let promptText: string | null = null;
+
+    if (mode === "random") {
+      const prompt = createRandomPrompt();
+      promptText = prompt.content;
+      setChatState((prev) => ({
+        ...prev,
+        random: [{ ...prompt, content: "", meta: "正在准备…" }],
+      }));
+    } else if (mode === "direct") {
+      const prompt = createDirectPrompt();
+      promptText = prompt.content;
+      setChatState((prev) => ({
+        ...prev,
+        direct: [{ ...prompt, content: "", meta: "正在准备…" }],
+      }));
+    } else if (hasContinueProgress) {
+      const prompt = createContinuePrompt(draft);
+      promptText = prompt.content;
+      setChatState((prev) => ({
+        ...prev,
+        continue: [{ ...prompt, content: "", meta: "正在准备…" }],
+      }));
+    } else {
+      setChatState((prev) => ({ ...prev, continue: [] }));
+    }
+
+    if (promptText) {
+      streamIntoMessage(mode, promptText);
+    }
+    setDraftInput((prev) => ({ ...prev, [mode]: "" }));
   };
 
   const exportBook = async (format: "docx" | "pdf") => {
@@ -530,14 +623,14 @@ export default function Home() {
     if (!text || isLoading) return;
 
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       role: "user",
       content: text,
       meta: currentMode === "direct" ? "主动讲述 · 已自动保存" : "已自动保存",
     };
 
     const nextMessages = [...activeMessages, userMessage];
-    const aiMessageId = crypto.randomUUID();
+    const aiMessageId = generateId();
     const pendingAiMessage: Message = {
       id: aiMessageId,
       role: "ai",
@@ -626,10 +719,12 @@ export default function Home() {
   const finishRound = () => {
     const nextDraft = createDraft(currentMode, activeMessages, currentMode === "continue" ? selectedChapter?.title : undefined);
     setDraft(nextDraft);
+    const prompt = createContinuePrompt(nextDraft);
     setChatState((prev) => ({
       ...prev,
-      continue: [createContinuePrompt(nextDraft)],
+      continue: [{ ...prompt, content: "", meta: "正在准备…" }],
     }));
+    streamIntoMessage("continue", prompt.content);
     setScreen("result");
   };
 
@@ -722,6 +817,28 @@ export default function Home() {
     setFilterOpen(false);
   };
 
+  const publishSelectedChapter = async () => {
+    if (!selectedChapter) return;
+    setCommunityHint("");
+    try {
+      const response = await fetch("/api/community/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chapterId: selectedChapter.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setCommunityHint(data.message || "发布失败，请稍后再试。");
+        return;
+      }
+      setCommunityWorks(data.communityWorks || []);
+      setSelectedWorkId(data.published?.id || "");
+      setCommunityHint(data.message || "已发布到社区。");
+    } catch {
+      setCommunityHint("发布失败，请稍后再试。");
+    }
+  };
+
   const handleLogin = async () => {
     setLoginError("");
     try {
@@ -736,6 +853,8 @@ export default function Home() {
         return;
       }
       setAuthUsername(data.username);
+      setCommunityWorks([]);
+      setSelectedWorkId("");
       setAuthStatus("authenticated");
       setHasLoadedState(false);
     } catch {
@@ -779,11 +898,10 @@ export default function Home() {
                     <img src="/assets/home_hero.jpg" alt="落卷欢迎图" />
                   </div>
                   <h2>欢迎回到落卷</h2>
-                  <p>这是给家人使用的单用户私有版本。登录后才能看到书稿、章节和回忆记录。</p>
+                  <p>你和亲友各有一个独立账号，书稿互不互通。只有发布到社区的作品才能互相看到。</p>
                 </div>
                 <div className="soft-card auth-card">
                   <strong className="section-title">登录</strong>
-                  <p>先用你的私有账号进入应用，后面再继续做成可安装的 App。</p>
                   <div className="auth-form">
                     <input
                       className="auth-input"
@@ -803,7 +921,7 @@ export default function Home() {
                       }
                     />
                   </div>
-                  {loginHint ? <p className="auth-hint">{loginHint}</p> : null}
+                  
                   {loginError ? <p className="auth-error">{loginError}</p> : null}
                   <button className="main-btn" onClick={handleLogin}>
                     进入落卷
@@ -812,63 +930,86 @@ export default function Home() {
               </div>
             )}
 
-            {authStatus === "authenticated" && (
+            {authStatus === "authenticated" && !hasLoadedState && (
+              <div className="auth-screen">
+                <div className="soft-card auth-card">
+                  <strong>正在加载你的回忆…</strong>
+                  <p>正在从云端同步数据，请稍等。</p>
+                </div>
+              </div>
+            )}
+
+            {authStatus === "authenticated" && hasLoadedState && (
               <>
             {screen === "home" && (
               <div className="screen-view active">
-                <Header
-                  title="落卷"
-                  subtitle={`欢迎回来，${authUsername}`}
-                  actionLabel="退出"
-                  onAction={handleLogout}
-                />
-                <div className="hero-card">
+                <div className="topbar">
+                  <div className="topbar-left">
+                    <div className="title-stack">
+                      <small>{easyAccessMode ? "" : currentAccount?.displayName || authUsername}</small>
+                      <strong>落卷</strong>
+                    </div>
+                  </div>
+                  {easyAccessMode ? (
+                    <button className="avatar-btn" aria-label="个人设置" />
+                  ) : (
+                    <button className="icon-btn" onClick={handleLogout}>
+                      退出
+                    </button>
+                  )}
+                </div>
+
+                <div className="hero-card" style={{ textAlign: "center" }}>
                   <div className="hero-media">
-                    <img src="/assets/home_hero.jpg" alt="落卷首页主视觉" />
+                    <img src="/assets/home_hero.jpg" alt="落卷" />
                   </div>
                   <h2>慢慢写下你的一生。</h2>
                   <p>把想留下的那一段，慢慢讲成一本书。</p>
                 </div>
 
-                <button
-                  className={`soft-card action-card ${hasContinueProgress ? "" : "disabled-card"}`}
-                  onClick={() => {
-                    if (!hasContinueProgress) return;
-                    if (hasChapterProgress) goToScreen("book");
-                    else if (hasDraftProgress) goToScreen("result");
-                  }}
-                  disabled={!hasContinueProgress}
-                >
-                  <strong>当前进度</strong>
-                  <p>{homeProgressText}</p>
-                  <div className="meta-row">
-                    <span className="tiny-tag">{homeProgressTitle}</span>
-                    <span className="tiny-tag">{hasChapterProgress ? `已写${chapters.length}章` : "尚未成章"}</span>
+                {hasContinueProgress ? (
+                  <button className="main-btn" onClick={() => openChatMode("continue")}>
+                    继续写
+                  </button>
+                ) : (
+                  <button className="main-btn" onClick={() => goToScreen("start")}>
+                    开始写
+                  </button>
+                )}
+
+                {hasChapterProgress && currentProgressChapter ? (
+                  <div className="soft-card" style={{ display: "grid", gap: 8 }}>
+                    <div className="subtitle">当前进度</div>
+                    <div className="book-layout">
+                      <div className="book-cover">
+                        <img src="/assets/station_lunchbox_cover.jpg" alt="书封" />
+                      </div>
+                      <div>
+                        <strong>{bookTitle}</strong>
+                        <p style={{ fontSize: 12, margin: "4px 0 0" }}>
+                          {currentProgressChapter.title}
+                        </p>
+                        <p style={{ fontSize: 11, margin: "2px 0 0", color: "var(--muted)" }}>
+                          {hasChapterProgress ? `已写 ${chapters.length} 章` : ""}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </button>
+                ) : hasDraftProgress ? (
+                  <div className="soft-card">
+                    <div className="subtitle">当前进度</div>
+                    <p style={{ margin: "6px 0 0" }}>{draft.content}</p>
+                  </div>
+                ) : null}
 
                 <div className="split-grid">
-                  <button
-                    className={`soft-card action-card ${hasContinueProgress ? "" : "disabled-card"}`}
-                    onClick={() => {
-                      if (hasContinueProgress) openChatMode("continue");
-                    }}
-                    disabled={!hasContinueProgress}
-                  >
-                    <strong>继续回忆</strong>
-                    <p>{continueHintText}</p>
-                    <div className="meta-row">
-                      <span className="tiny-tag">{hasContinueProgress ? "继续当前" : "暂未开启"}</span>
-                      <span className="tiny-tag">{hasChapterProgress ? "回到上一章" : "等待第一段"}</span>
-                    </div>
-                  </button>
                   <button className="soft-card action-card" onClick={() => goToScreen("start")}>
-                    <strong>开启新章节</strong>
-                    <p>开启新的一章，然后选择随机提问或主动讲述。</p>
-                    <div className="meta-row">
-                      <span className="tiny-tag">随机提问</span>
-                      <span className="tiny-tag">主动讲述</span>
-                    </div>
+                    <strong>开启新回忆</strong>
+                    <p>开启一段新的讲述</p>
+                  </button>
+                  <button className="soft-card action-card" onClick={() => goToScreen("book")}>
+                    <strong>{chapters.length > 0 ? "浏览书稿" : "看看成书"}</strong>
+                    <p>{chapters.length > 0 ? `共 ${chapters.length} 章` : "你的回忆会在这里变成一本书"}</p>
                   </button>
                 </div>
 
@@ -950,13 +1091,6 @@ export default function Home() {
                           ? "继续讲这一段"
                           : "继续补写这一章"}
                       </strong>
-                      <span>
-                        {currentMode === "random"
-                          ? "这里是 AI 先问，你来回应。"
-                          : currentMode === "direct"
-                          ? "这里是你先讲，AI 顺着内容追问。"
-                          : "这里会带着当前章节上下文继续追问。"}
-                      </span>
                     </div>
                     <textarea
                       className="composer-input"
@@ -973,17 +1107,17 @@ export default function Home() {
                         }))
                       }
                     />
-                    <div className="composer-actions">
-                      <button className="ghost-btn" onClick={handleSend}>
-                        发送文字
-                      </button>
-                      <button className="ghost-btn" onClick={clearCurrentConversation}>
-                        清空本轮
+                    <div className="composer-actions single-main">
+                      <button className="main-btn" onClick={handleSend}>
+                        发送
                       </button>
                     </div>
                     <div className="composer-actions">
+                      <button className="ghost-btn" onClick={clearCurrentConversation}>
+                        清空本轮会话
+                      </button>
                       <button className="ghost-btn" onClick={finishRound}>
-                        结束本轮
+                        结束本轮会话
                       </button>
                     </div>
                   </div>
@@ -1221,10 +1355,14 @@ export default function Home() {
                   </button>
                 </div>
                 <div className="detail-actions">
+                  <button className="secondary-btn" onClick={publishSelectedChapter}>
+                    发布到社区
+                  </button>
                   <button className="secondary-btn danger-btn" onClick={deleteCurrentChapter}>
                     删除这一章
                   </button>
                 </div>
+                {communityHint ? <p className="share-hint">{communityHint}</p> : null}
                 <BottomTabs active={tabActive} onNavigate={goToScreen} />
               </div>
             )}
@@ -1237,15 +1375,52 @@ export default function Home() {
                   actionLabel="退出"
                   onAction={handleLogout}
                 />
-                <div className="detail-note">
-                  <strong>社区暂未开放</strong>
-                  <p>这是单用户私有版本，当前先只保留个人回忆录功能。等你和妈妈用顺之后，再决定是否开放社区与作品浏览。</p>
-                </div>
+                {communityWorks.length ? (
+                  <>
+                    <div className="detail-note">
+                      <strong>社区已开放</strong>
+                      <p>这里会显示你和亲友已经发布出来的章节作品。私有书稿各自独立，不会混进对方的成书页。</p>
+                    </div>
+                    <div className="stack">
+                      {communityWorks.map((work) => (
+                        <button
+                          key={work.id}
+                          className="chapter-card chapter-directory-card"
+                          onClick={() => {
+                            setSelectedWorkId(work.id);
+                            goToScreen("work");
+                          }}
+                        >
+                          <div className="directory-row">
+                            <div className="directory-number">{work.authorLabel}</div>
+                            <div className="directory-main">
+                              <div className="row-between directory-head">
+                                <strong className="directory-title">{work.title}</strong>
+                                <span className="state">{work.authorName}</span>
+                              </div>
+                              <p className="directory-summary">{work.summary}</p>
+                              <div className="directory-meta">
+                                <span>{`${work.content.length} 段内容`}</span>
+                                <span>{work.tags.join(" / ") || "回忆录"}</span>
+                                <span>看作品</span>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="detail-note">
+                    <strong>社区里还没有作品</strong>
+                    <p>先在章节详情页点击"发布到社区"。发布后，你和亲友都能在这里看到彼此发布的作品。</p>
+                  </div>
+                )}
                 <BottomTabs active={tabActive} onNavigate={goToScreen} />
               </div>
             )}
 
-            {screen === "work" && (
+            {screen === "work" && selectedWork && (
               <div className="screen-view active">
                 <Header
                   title={selectedWork.title}
@@ -1273,11 +1448,12 @@ export default function Home() {
                 </div>
                 <div className="detail-note">
                   <strong>作者小记</strong>
-                  <p>{selectedWork.author}。这位作者擅长从一个意象切入，把一整代人的生活感慢慢写出来。</p>
+                  <p>{`${selectedWork.authorName}（${selectedWork.authorLabel}）`}。这篇作品来自对方账号发布到社区的章节内容。</p>
                 </div>
                 <div className="detail-actions">
-                  <button className="secondary-btn">看作者更多作品</button>
-                  <button className="secondary-btn">查看评论</button>
+                  <button className="secondary-btn" onClick={() => goToScreen("community")}>
+                    返回社区
+                  </button>
                 </div>
                 <BottomTabs active={tabActive} onNavigate={goToScreen} />
               </div>
