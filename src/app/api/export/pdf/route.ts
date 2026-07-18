@@ -79,38 +79,46 @@ async function renderPdfBuffer(input: {
 }
 
 export async function GET() {
-  const session = await getCurrentSession();
-  if (!session) {
-    return NextResponse.json({ message: "未登录" }, { status: 401 });
+  try {
+    const session = await getCurrentSession();
+    if (!session) {
+      return NextResponse.json({ message: "未登录" }, { status: 401 });
+    }
+
+    const state = await loadAppState(session.username);
+    const bookTitle = state.bookTitle?.trim() || "落卷回忆录";
+    const now = new Date();
+    const dateTag = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate()
+    ).padStart(2, "0")}`;
+
+    const buffer = await renderPdfBuffer({
+      title: bookTitle,
+      dateTag,
+      chapters: state.chapters.map((chapter) => ({
+        title: chapter.title || "",
+        summary: chapter.summary || "",
+        content: chapter.content ?? [],
+      })),
+      draft: state.draft?.content?.trim()
+        ? { title: state.draft.title || "未收录草稿", content: state.draft.content }
+        : undefined,
+    });
+
+    const fileName = `${safeFileName(bookTitle)}_${dateTag}.pdf`;
+
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+      },
+    });
+  } catch (error) {
+    console.error("pdf export error:", error);
+    return NextResponse.json(
+      { message: "导出失败", error: String(error) },
+      { status: 500 }
+    );
   }
-
-  const state = await loadAppState(session.username);
-  const bookTitle = state.bookTitle?.trim() || "落卷回忆录";
-  const now = new Date();
-  const dateTag = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-    now.getDate()
-  ).padStart(2, "0")}`;
-
-  const buffer = await renderPdfBuffer({
-    title: bookTitle,
-    dateTag,
-    chapters: state.chapters.map((chapter) => ({
-      title: chapter.title || "",
-      summary: chapter.summary || "",
-      content: chapter.content ?? [],
-    })),
-    draft: state.draft?.content?.trim()
-      ? { title: state.draft.title || "未收录草稿", content: state.draft.content }
-      : undefined,
-  });
-
-  const fileName = `${safeFileName(bookTitle)}_${dateTag}.pdf`;
-
-  return new Response(buffer as unknown as BodyInit, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${fileName}"`,
-    },
-  });
 }
