@@ -393,10 +393,16 @@ export default function Home() {
     }
 
     if (mode === "continue" && !chatState.continue.some((m) => m.role === "user") && hasContinueProgress) {
+      // 把其他模式（random / direct）中的用户消息合并到 continue 模式，
+      // 这样"继续补充"时之前的对话记录不会丢失
+      const otherUserMessages = Object.entries(chatState)
+        .filter(([key]) => key !== "continue")
+        .flatMap(([, messages]) => messages)
+        .filter((m) => m.role === "user");
       const prompt = createContinuePrompt(draft);
       setChatState((prev) => ({
         ...prev,
-        continue: [{ ...prompt, content: "", meta: "正在准备…" }],
+        continue: [...otherUserMessages, { ...prompt, content: "", meta: "正在准备…" }],
       }));
       streamIntoMessage(mode, prompt.content);
     }
@@ -452,11 +458,16 @@ export default function Home() {
         direct: [{ ...prompt, content: "", meta: "正在准备…" }],
       }));
     } else if (hasContinueProgress) {
+      // 清空时保留其他模式的用户消息，不丢失对话历史
+      const otherUserMessages = Object.entries(chatState)
+        .filter(([key]) => key !== "continue")
+        .flatMap(([, messages]) => messages)
+        .filter((m) => m.role === "user");
       const prompt = createContinuePrompt(draft);
       promptText = prompt.content;
       setChatState((prev) => ({
         ...prev,
-        continue: [{ ...prompt, content: "", meta: "正在准备…" }],
+        continue: [...otherUserMessages, { ...prompt, content: "", meta: "正在准备…" }],
       }));
     } else {
       setChatState((prev) => ({ ...prev, continue: [] }));
@@ -719,10 +730,14 @@ export default function Home() {
   const finishRound = () => {
     const nextDraft = createDraft(currentMode, activeMessages, currentMode === "continue" ? selectedChapter?.title : undefined);
     setDraft(nextDraft);
+    const otherUserMessages = Object.entries(chatState)
+      .filter(([key]) => key !== "continue")
+      .flatMap(([, messages]) => messages)
+      .filter((m) => m.role === "user");
     const prompt = createContinuePrompt(nextDraft);
     setChatState((prev) => ({
       ...prev,
-      continue: [{ ...prompt, content: "", meta: "正在准备…" }],
+      continue: [...otherUserMessages, { ...prompt, content: "", meta: "正在准备…" }],
     }));
     streamIntoMessage("continue", prompt.content);
     setScreen("result");
