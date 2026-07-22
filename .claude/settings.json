@@ -34,7 +34,10 @@
       "Bash(git -c core.compression=0 push)",
       "Bash(curl -s -b /tmp/rw_cookies.txt -o /dev/null -w 'DOCX: HTTP %{http_code}, size %{size_download}' https://luojuan-production.up.railway.app/api/export/docx)",
       "Bash(curl -s -b /tmp/rw_cookies.txt -o /dev/null -w 'PDF: HTTP %{http_code}, size %{size_download}' https://luojuan-production.up.railway.app/api/export/pdf)",
-      "Bash(git commit -m 'fix: Content-Disposition header with Chinese chars *)"
+      "Bash(git commit -m 'fix: Content-Disposition header with Chinese chars *)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt -o /tmp/docx_result.docx -w 'DOCX: HTTP %{http_code}, size %{size_download} bytes' https://luojuan-production.up.railway.app/api/export/docx)",
+      "Bash(curl -s -b /tmp/rw_cookies.txt -o /tmp/pdf_result.pdf -w 'PDF: HTTP %{http_code}, size %{size_download} bytes' https://luojuan-production.up.railway.app/api/export/pdf)",
+      "Bash(git commit -m 'feat: remove hard word limit from organize prompt, adapt to source length *)"
     ]
   }
 }
